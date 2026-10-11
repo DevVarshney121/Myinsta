@@ -29,3 +29,50 @@
   .home-recent{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
   .home-section-head h3{font-size:15px}
 }
+
+/* Home is a normal scrollable post grid; selecting a tile opens the immersive reel viewer. */
+.home-panel{max-width:1050px;margin:22px auto}
+.home-heading{display:flex;justify-content:space-between;align-items:center;margin:0 0 18px}
+.home-heading h2{font-size:26px;margin:6px 0 0}
+.home-total{font-size:12px;color:#aaa}
+.home-post-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.home-post{position:relative;display:block;aspect-ratio:3/4;overflow:hidden;border:0;padding:0;background:#111;cursor:pointer}
+.home-post video{display:block;width:100%;height:100%;object-fit:cover;transition:transform .35s ease}
+.home-post:hover video{transform:scale(1.025)}
+.home-post:after{content:"";position:absolute;inset:40% 0 0;background:linear-gradient(transparent,#0007);pointer-events:none}
+.home-post .post-play{position:absolute;right:10px;top:10px;z-index:2;font-size:15px;text-shadow:0 1px 5px #000}
+.home-post .post-caption{position:absolute;z-index:2;left:10px;right:10px;bottom:10px;font-size:11px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 5px #000}
+.home-empty{text-align:center;padding:55px 20px}
+.home-empty p{color:#aaa;font-size:13px;line-height:1.6}
+#feedView.reels-active{height:calc(100vh - 95px);height:calc(100dvh - 95px);overflow-y:auto;overscroll-behavior-y:contain;scroll-snap-type:y mandatory;scroll-behavior:smooth;scrollbar-width:none}
+#feedView.reels-active::-webkit-scrollbar{display:none}
+#feedView.reels-active .feed-status{position:sticky;top:0;z-index:5;background:#000;padding:10px 13px}
+#feedView.reels-active .reel-feed{display:block}
+#feedView.reels-active .reel-card{scroll-snap-align:start;scroll-snap-stop:always;margin-bottom:0}
+#feedView.reels-active .video-wrap{height:calc(100dvh - 150px);min-height:0;max-height:none}
+#feedView.reels-active .reel-footer{display:none}
+@media(min-width:701px){
+  #feedView.reels-active{height:calc(100vh - 115px);height:calc(100dvh - 115px)}
+  #feedView.reels-active .video-wrap{height:calc(100dvh - 175px)}
+}
+@media(max-width:700px){
+  .home-panel{margin:0}
+  .home-heading{padding:14px 14px 12px;margin:0}
+  .home-heading h2{font-size:21px}
+  .home-post-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}
+  .home-post .post-caption{font-size:10px;left:6px;right:6px;bottom:7px}
+  #feedView.reels-active{height:calc(100svh - 107px);height:calc(100dvh - 107px)}
+  #feedView.reels-active .feed-status{display:none}
+  #feedView.reels-active .reel-card{height:100%;scroll-snap-align:start;scroll-snap-stop:always}
+  #feedView.reels-active .video-wrap{height:100%;height:calc(100dvh - 107px);min-height:0}
+  #feedView.reels-active .reel-video{object-fit:cover}
+  #feedView.reels-active .reel-actions{bottom:80px}
+  #feedView.reels-active .reel-caption{bottom:16px}
+}
+
+@media(max-width:700px){.mobile-bottom{grid-template-columns:repeat(3,1fr)}}
+
+.profile-grid .grid-video{cursor:pointer}
+.profile-delete,.profile-download{position:absolute;bottom:7px;z-index:4;border:0;border-radius:5px;background:#000b;color:#fff;padding:5px 7px;font-size:10px}
+.profile-delete{right:7px;color:#ff8a96}.profile-download{left:7px}
+.home-post-grid{scroll-snap-type:none}

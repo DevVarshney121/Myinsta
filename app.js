@@ -58,11 +58,10 @@
       <div class="reel-actions">
         <button class="reel-action" data-action="sound" aria-label="Toggle sound"><span class="glyph">♬</span><small>Sound</small></button>
         <button class="reel-action" data-action="caption" aria-label="Show caption"><span class="glyph">☰</span><small>Caption</small></button>
-        <button class="reel-action" data-action="delete" aria-label="Delete reel"><span class="glyph">⋯</span><small>Remove</small></button>
       </div>
       <div class="reel-caption"><strong>your_reel</strong><p>${esc(caption)}</p><div class="audio-line">♫ <span>${esc(v.name.replace(/\.[^/.]+$/,""))}</span></div></div>
     </div>
-    <div class="reel-footer"><span class="file-name">${esc(v.name)} · ${sizeText(v.size)}</span><div class="footer-actions"><button class="text-btn" data-action="download">Download</button><button class="text-btn delete-btn" data-action="delete">Delete</button></div></div>`;
+    <div class="reel-footer"><span class="file-name">${esc(v.name)} · ${sizeText(v.size)}</span><div class="footer-actions"><span>Reel</span></div></div>`;
     const video=card.querySelector("video");
     video.addEventListener("click",()=>togglePlay(card));
     video.addEventListener("play",()=>card.querySelector(".video-wrap").classList.remove("paused"));
@@ -75,33 +74,46 @@
     $("#homePanel").hidden=view!=="home";
     $("#feedView").hidden=view!=="feed";
     $("#profilePanel").hidden=view!=="profile";
+    $("#feedView").classList.toggle("reels-active",view==="feed");
     $("#feedLabel").textContent="Random reel feed";
     $("#reelCount").textContent=`${videos.length} videos`;
     $("#profilePosts").textContent=videos.length;
     $("#profileReels").textContent=videos.length;
     const totalSize=videos.reduce((n,v)=>n+(v.size||0),0);
     $("#profileSize").textContent=sizeText(totalSize);
-    $("#homeVideoCount").textContent=videos.length;
-    $("#homeStorage").textContent=sizeText(totalSize);
-    $("#emptyState").hidden=videos.length>0;
+    $("#homeVideoCount").textContent=`${videos.length} videos`;
+    $("#homeEmpty").hidden=videos.length>0;
+    $("#emptyState").hidden=true;
     feed.replaceChildren();
     ordered.forEach((v,i)=>feed.append(makeCard(v,i)));
-    const recent=$("#homeRecent");recent.replaceChildren();
-    videos.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,8).forEach(v=>{
-      const button=document.createElement("button");button.title=v.name;
+
+    // Home shows a regular, scrollable grid of all videos. Tapping any tile opens that reel.
+    const homeGrid=$("#homeRecent");homeGrid.replaceChildren();
+    videos.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(v=>{
+      const tile=document.createElement("button");tile.className="home-post";tile.title=v.name;
       const u=URL.createObjectURL(v.blob);
-      button.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>${esc(v.name)}</span>`;
-      button.addEventListener("click",()=>{view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
-      recent.append(button);
+      tile.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span class="post-play">▶</span><span class="post-caption">${esc(v.caption||v.name)}</span>`;
+      tile.addEventListener("click",()=>{
+        view="feed";render();
+        const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);
+        if(target) target.scrollIntoView({behavior:"smooth",block:"start"});
+        const video=target?.querySelector("video");
+        if(video) setTimeout(()=>video.play().catch(()=>{}),350);
+      });
+      homeGrid.append(tile);
     });
+
     const grid=$("#profileGrid");grid.replaceChildren();
     ordered.forEach(v=>{
-      const b=document.createElement("button");b.className="grid-video";b.title=v.name;
-      const u=URL.createObjectURL(v.blob);b.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span>`;
-      b.addEventListener("click",()=>{view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
-      grid.append(b);
+      const wrap=document.createElement("button");wrap.className="grid-video";wrap.title=v.name;
+      const u=URL.createObjectURL(v.blob);wrap.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span><button type="button" class="profile-delete" data-profile-delete="${esc(v.id)}">Delete</button><button type="button" class="profile-download" data-profile-download="${esc(v.id)}">Download</button>`;
+      wrap.addEventListener("click",(event)=>{if(event.target.closest("[data-profile-delete],[data-profile-download]"))return;view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
+      grid.append(wrap);
     });
-    document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>b.classList.toggle("selected",b.dataset.action===view||(view==="feed"&&b.dataset.action==="feed")));
+    document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>{
+      b.classList.toggle("selected",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
+      b.classList.toggle("active",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
+    });
   }
   function togglePlay(card){
     const v=card.querySelector("video");
@@ -125,13 +137,15 @@
   }
   function setView(next){
     if(next==="upload"){openPicker();return;}
-    if(next==="open-reels") next="feed";
     view=next==="profile"?"profile":next==="home"?"home":"feed";
     render();
-    // Home/profile use normal document scrolling; the Reels feed snaps one reel at a time.
     if(innerWidth<700)scrollTo({top:0,behavior:"smooth"});
   }
-  document.addEventListener("click",e=>{
+  document.addEventListener("click",async e=>{
+    const del=e.target.closest("[data-profile-delete]");
+    if(del){e.stopPropagation();const item=videos.find(v=>v.id===del.dataset.profileDelete);if(item){if(confirm(`Delete "${item.name}" from this browser?`)){await remove(item.id);await reload();newShuffle();render();notify("Video deleted.");}}return;}
+    const down=e.target.closest("[data-profile-download]");
+    if(down){e.stopPropagation();const item=videos.find(v=>v.id===down.dataset.profileDownload);if(item){const u=URL.createObjectURL(item.blob),a=document.createElement("a");a.href=u;a.download=item.name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);}return;}
     const b=e.target.closest("button");if(!b)return;
     if(b.closest(".reel-card")&&b.dataset.action){action(b);return;}
     if(b.dataset.action)setView(b.dataset.action);
