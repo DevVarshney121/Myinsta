@@ -71,17 +71,29 @@
   }
   function render(){
     const ordered=orderedVideos();
-    $("#pageTitle").textContent=view==="profile"?"Profile":"Reels";
-    $("#feedView").hidden=view==="profile";
+    $("#pageTitle").textContent=view==="profile"?"Profile":view==="home"?"Home":"Reels";
+    $("#homePanel").hidden=view!=="home";
+    $("#feedView").hidden=view!=="feed";
     $("#profilePanel").hidden=view!=="profile";
     $("#feedLabel").textContent="Random reel feed";
     $("#reelCount").textContent=`${videos.length} videos`;
     $("#profilePosts").textContent=videos.length;
     $("#profileReels").textContent=videos.length;
-    $("#profileSize").textContent=sizeText(videos.reduce((n,v)=>n+(v.size||0),0));
+    const totalSize=videos.reduce((n,v)=>n+(v.size||0),0);
+    $("#profileSize").textContent=sizeText(totalSize);
+    $("#homeVideoCount").textContent=videos.length;
+    $("#homeStorage").textContent=sizeText(totalSize);
     $("#emptyState").hidden=videos.length>0;
     feed.replaceChildren();
     ordered.forEach((v,i)=>feed.append(makeCard(v,i)));
+    const recent=$("#homeRecent");recent.replaceChildren();
+    videos.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,8).forEach(v=>{
+      const button=document.createElement("button");button.title=v.name;
+      const u=URL.createObjectURL(v.blob);
+      button.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>${esc(v.name)}</span>`;
+      button.addEventListener("click",()=>{view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
+      recent.append(button);
+    });
     const grid=$("#profileGrid");grid.replaceChildren();
     ordered.forEach(v=>{
       const b=document.createElement("button");b.className="grid-video";b.title=v.name;
@@ -113,7 +125,10 @@
   }
   function setView(next){
     if(next==="upload"){openPicker();return;}
-    view=next==="profile"?"profile":"feed";render();
+    if(next==="open-reels") next="feed";
+    view=next==="profile"?"profile":next==="home"?"home":"feed";
+    render();
+    // Home/profile use normal document scrolling; the Reels feed snaps one reel at a time.
     if(innerWidth<700)scrollTo({top:0,behavior:"smooth"});
   }
   document.addEventListener("click",e=>{
