@@ -3,7 +3,7 @@
   const DB_NAME="reelgram-private-video-library", DB_VERSION=1, STORE="videos";
   const $=s=>document.querySelector(s);
   const picker=$("#videoPicker"), dialog=$("#uploadDialog"), feed=$("#reelFeed");
-  let db, videos=[], selectedFiles=[], view="home", toastTimer, shuffledIds=[];
+  let db, videos=[], selectedFiles=[], view="feed", toastTimer, shuffledIds=[];
 
   const openDB=()=>new Promise((resolve,reject)=>{
     const r=indexedDB.open(DB_NAME,DB_VERSION);
@@ -58,10 +58,11 @@
       <div class="reel-actions">
         <button class="reel-action" data-action="sound" aria-label="Toggle sound"><span class="glyph">♬</span><small>Sound</small></button>
         <button class="reel-action" data-action="caption" aria-label="Show caption"><span class="glyph">☰</span><small>Caption</small></button>
+        <button class="reel-action" data-action="delete" aria-label="Delete reel"><span class="glyph">⋯</span><small>Remove</small></button>
       </div>
       <div class="reel-caption"><strong>your_reel</strong><p>${esc(caption)}</p><div class="audio-line">♫ <span>${esc(v.name.replace(/\.[^/.]+$/,""))}</span></div></div>
     </div>
-    <div class="reel-footer"><span class="file-name">${esc(v.name)} · ${sizeText(v.size)}</span><div class="footer-actions"><span>Reel</span></div></div>`;
+    <div class="reel-footer"><span class="file-name">${esc(v.name)} · ${sizeText(v.size)}</span><div class="footer-actions"><button class="text-btn" data-action="download">Download</button><button class="text-btn delete-btn" data-action="delete">Delete</button></div></div>`;
     const video=card.querySelector("video");
     video.addEventListener("click",()=>togglePlay(card));
     video.addEventListener("play",()=>card.querySelector(".video-wrap").classList.remove("paused"));
@@ -70,64 +71,25 @@
   }
   function render(){
     const ordered=orderedVideos();
-    $("#pageTitle").textContent=view==="profile"?"Profile":view==="home"?"Home":"Reels";
-    $("#homePanel").hidden=view!=="home";
-    $("#feedView").hidden=view!=="feed";
+    $("#pageTitle").textContent=view==="profile"?"Profile":"Reels";
+    $("#feedView").hidden=view==="profile";
     $("#profilePanel").hidden=view!=="profile";
-    $("#feedView").classList.toggle("reels-active",view==="feed");
-    document.body.classList.toggle("reels-open",view==="feed");
     $("#feedLabel").textContent="Random reel feed";
     $("#reelCount").textContent=`${videos.length} videos`;
     $("#profilePosts").textContent=videos.length;
     $("#profileReels").textContent=videos.length;
-    const totalSize=videos.reduce((n,v)=>n+(v.size||0),0);
-    $("#profileSize").textContent=sizeText(totalSize);
-    $("#homeVideoCount").textContent=`${videos.length} videos`;
-    $("#homeEmpty").hidden=videos.length>0;
-    $("#emptyState").hidden=true;
-
-    // Dedicated viewer cards are shuffled and have no download/delete controls.
+    $("#profileSize").textContent=sizeText(videos.reduce((n,v)=>n+(v.size||0),0));
+    $("#emptyState").hidden=videos.length>0;
     feed.replaceChildren();
     ordered.forEach((v,i)=>feed.append(makeCard(v,i)));
-
-    // Home behaves like a normal feed: story strip + stacked video posts. Tapping a post opens Reels at that video.
-    const storyRow=$("#storyRow");storyRow.replaceChildren();
-    const stories=[{label:"Your story",initial:"＋"},...videos.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,12).map(v=>({label:v.name.replace(/\.[^/.]+$/,""),initial:"▶"}))];
-    stories.forEach(s=>{
-      const item=document.createElement("button");item.className="story-item";item.innerHTML=`<div class="story-ring"><div class="story-ring-inner">${esc(s.initial)}</div></div><small>${esc(s.label)}</small>`;
-      item.addEventListener("click",()=>{if(s.label==="Your story")openPicker();else{const found=videos.find(v=>v.name.replace(/\.[^/.]+$/,"")===s.label);if(found)openReel(found.id);}});
-      storyRow.append(item);
-    });
-    const homeFeed=$("#homeRecent");homeFeed.replaceChildren();
-    videos.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(v=>{
-      const tile=document.createElement("button");tile.className="home-post";tile.title=v.name;
-      const u=URL.createObjectURL(v.blob);
-      tile.innerHTML=`<div class="home-post-head"><span class="user-avatar">Y</span><span>your_reel</span></div><video src="${u}" muted playsinline preload="metadata"></video><span class="post-play">▶</span><span class="post-caption">${esc(v.caption||v.name)}</span>`;
-      tile.addEventListener("click",()=>openReel(v.id));
-      homeFeed.append(tile);
-    });
-
     const grid=$("#profileGrid");grid.replaceChildren();
     ordered.forEach(v=>{
-      const wrap=document.createElement("div");wrap.className="grid-video";wrap.title=v.name;wrap.setAttribute("role","button");wrap.tabIndex=0;
-      const u=URL.createObjectURL(v.blob);wrap.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span><button type="button" class="profile-delete" data-profile-delete="${esc(v.id)}">Delete</button><button type="button" class="profile-download" data-profile-download="${esc(v.id)}">Download</button>`;
-      wrap.addEventListener("click",(event)=>{if(event.target.closest("[data-profile-delete],[data-profile-download]"))return;openReel(v.id);});
-      grid.append(wrap);
+      const b=document.createElement("button");b.className="grid-video";b.title=v.name;
+      const u=URL.createObjectURL(v.blob);b.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span>`;
+      b.addEventListener("click",()=>{view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
+      grid.append(b);
     });
-    document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>{
-      b.classList.toggle("selected",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
-      b.classList.toggle("active",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
-    });
-  }
-  function openReel(id){
-    newShuffle();
-    const at=shuffledIds.indexOf(id);
-    if(at>0){shuffledIds.splice(at,1);shuffledIds.unshift(id);}
-    view="feed";render();
-    const target=feed.querySelector(`[data-id="${CSS.escape(id)}"]`);
-    if(target) target.scrollIntoView({behavior:"instant",block:"start"});
-    const video=target?.querySelector("video");
-    if(video) setTimeout(()=>video.play().catch(()=>{}),120);
+    document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>b.classList.toggle("selected",b.dataset.action===view||(view==="feed"&&b.dataset.action==="feed")));
   }
   function togglePlay(card){
     const v=card.querySelector("video");
@@ -151,15 +113,10 @@
   }
   function setView(next){
     if(next==="upload"){openPicker();return;}
-    view=next==="profile"?"profile":next==="feed"?"feed":"home";
-    render();
+    view=next==="profile"?"profile":"feed";render();
     if(innerWidth<700)scrollTo({top:0,behavior:"smooth"});
   }
-  document.addEventListener("click",async e=>{
-    const del=e.target.closest("[data-profile-delete]");
-    if(del){e.stopPropagation();const item=videos.find(v=>v.id===del.dataset.profileDelete);if(item){if(confirm(`Delete "${item.name}" from this browser?`)){await remove(item.id);await reload();newShuffle();render();notify("Video deleted.");}}return;}
-    const down=e.target.closest("[data-profile-download]");
-    if(down){e.stopPropagation();const item=videos.find(v=>v.id===down.dataset.profileDownload);if(item){const u=URL.createObjectURL(item.blob),a=document.createElement("a");a.href=u;a.download=item.name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);}return;}
+  document.addEventListener("click",e=>{
     const b=e.target.closest("button");if(!b)return;
     if(b.closest(".reel-card")&&b.dataset.action){action(b);return;}
     if(b.dataset.action)setView(b.dataset.action);
