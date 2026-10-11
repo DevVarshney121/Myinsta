@@ -1,35 +1,30 @@
-# Reelgram — Instagram-inspired Reels frontend
+# Reelgram — Video-only Reels frontend
 
-A responsive, mobile-first short-video feed made with plain **HTML, CSS and vanilla JavaScript**. No React, no backend, no database service, and no build step.
+Built with plain HTML, CSS and JavaScript. No React, no backend and no external database.
 
 ## Run locally
 1. Extract the ZIP.
 2. Open the folder in VS Code.
-3. Install the Live Server extension if needed.
-4. Right-click `index.html` → **Open with Live Server**.
+3. Open `index.html` with Live Server.
 
-## Deploy to Vercel
-1. Push this folder to a GitHub repository.
-2. In Vercel, choose **Add New → Project** and import the repository.
-3. Framework Preset: **Other**.
-4. Build Command: leave blank.
-5. Output Directory: `.` (root).
-6. Deploy.
+## Deploy on Vercel
+1. Push the project folder to GitHub.
+2. Import the repository into Vercel.
+3. Select Framework Preset: Other.
+4. Leave Build Command blank and set Output Directory to `.`.
+5. Deploy.
 
-This is a static frontend. No environment variables or backend functions are required.
+## Included
+- Mobile-first Instagram-inspired reels UI
+- No search, follow, or like controls in the feed
+- Multi-video upload from desktop or phone
+- Videos stored as original file blobs in IndexedDB; the app does not transcode or intentionally compress uploads
+- Shuffled feed order on each page load and after adding/removing videos
+- One-at-a-time vertical scroll snapping on mobile
+- Auto-play for the most visible reel, pauses other reels
+- Mute/unmute, caption display, download and remove
+- Profile page with total post/reel counts and storage size
+- Responsive desktop sidebar and mobile bottom navigation
 
-## Features
-- Instagram-inspired dark UI with a mobile-first Reels layout and bottom navigation
-- Select multiple local videos in one upload
-- Videos persist in the browser using IndexedDB
-- Vertical feed, automatic play/pause for the mostly visible reel, likes, double-tap to like
-- Search, sorting, mute/unmute, download, and delete
-- Runs as a static site on Vercel
-
-## Important
-- Files selected in the browser are saved to **that browser/device only**. Vercel hosts the website files; it does not receive your videos.
-- The same reels will not automatically appear on another phone, browser, or visitor's device. A shared, server-hosted library requires a backend or external storage.
-- 1,000+ videos may use many gigabytes. Real capacity depends on video sizes, device space, and browser storage quota. Keep original backups.
-- Clearing browser/site data may delete the local library.
-- Video playback depends on browser-supported codecs; MP4/H.264 is a good compatibility choice.
-- This is an Instagram-inspired independent project and does not use Instagram's proprietary source code, logos, or assets.
+## Important storage facts
+This is a static frontend. Video files stay in the browser/device that uploaded them; they are not uploaded to Vercel and do not sync to other devices. IndexedDB storage limits vary by browser/device. 1,000+ videos may require many GB, and no frontend-only project can guarantee that storage will be available. Clearing site data can erase this library; keep original video backups.

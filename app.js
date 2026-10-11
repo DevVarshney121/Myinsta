@@ -1,183 +1,138 @@
 (() => {
   "use strict";
-  const DB_NAME = "reelgram-local-library";
-  const DB_VERSION = 1;
-  const STORE = "videos";
-  const $ = s => document.querySelector(s);
-  const picker = $("#videoPicker"), feed = $("#reelFeed"), dialog = $("#uploadDialog");
-  let db, reels = [], selectedFiles = [], query = "", view = "feed", toastTimer;
+  const DB_NAME="reelgram-private-video-library", DB_VERSION=1, STORE="videos";
+  const $=s=>document.querySelector(s);
+  const picker=$("#videoPicker"), dialog=$("#uploadDialog"), feed=$("#reelFeed");
+  let db, videos=[], selectedFiles=[], view="feed", toastTimer, shuffledIds=[];
 
-  const openDB = () => new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const d = request.result;
-      if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, {keyPath:"id"});
-    };
-    request.onsuccess = () => { db = request.result; resolve(); };
-    request.onerror = () => reject(request.error);
+  const openDB=()=>new Promise((resolve,reject)=>{
+    const r=indexedDB.open(DB_NAME,DB_VERSION);
+    r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:"id"});};
+    r.onsuccess=()=>{db=r.result;resolve();}; r.onerror=()=>reject(r.error);
   });
-  const store = mode => db.transaction(STORE, mode).objectStore(STORE);
-  const getAll = () => new Promise((resolve, reject) => {
-    const r = store("readonly").getAll(); r.onsuccess = () => resolve(r.result || []); r.onerror = () => reject(r.error);
-  });
-  const put = item => new Promise((resolve, reject) => {
-    const r = store("readwrite").put(item); r.onsuccess = resolve; r.onerror = () => reject(r.error);
-  });
-  const remove = id => new Promise((resolve, reject) => {
-    const r = store("readwrite").delete(id); r.onsuccess = resolve; r.onerror = () => reject(r.error);
-  });
-  const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const bytes = n => n > 1073741824 ? (n/1073741824).toFixed(1)+" GB" : (n/1048576).toFixed(1)+" MB";
-  function toast(message) {
-    const el = $("#toast"); el.textContent = message; el.classList.add("show");
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2400);
+  const store=mode=>db.transaction(STORE,mode).objectStore(STORE);
+  const getAll=()=>new Promise((resolve,reject)=>{const r=store("readonly").getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});
+  const put=item=>new Promise((resolve,reject)=>{const r=store("readwrite").put(item);r.onsuccess=resolve;r.onerror=()=>reject(r.error);});
+  const remove=id=>new Promise((resolve,reject)=>{const r=store("readwrite").delete(id);r.onsuccess=resolve;r.onerror=()=>reject(r.error);});
+  const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const sizeText=n=>n>=1073741824?(n/1073741824).toFixed(1)+" GB":(n/1048576).toFixed(1)+" MB";
+  function notify(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2500);}
+  function shuffle(array){for(let i=array.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[array[i],array[j]]=[array[j],array[i]];}return array;}
+  function newShuffle(){shuffledIds=shuffle(videos.map(v=>v.id));}
+  function openPicker(){picker.click();}
+  function selectFiles(files){
+    selectedFiles=Array.from(files||[]).filter(f=>f.type.startsWith("video/"));
+    if(!selectedFiles.length){notify("Select video files to continue.");return;}
+    $("#uploadSummary").textContent=`${selectedFiles.length} video(s) · ${sizeText(selectedFiles.reduce((n,f)=>n+f.size,0))}. Original files are stored without compression in this browser.`;
+    $("#captionInput").value="";
+    if(dialog.showModal)dialog.showModal();else if(confirm(`Add ${selectedFiles.length} videos?`))saveVideos();
   }
-  function openPicker() { picker.click(); }
-  function selectVideos(files) {
-    selectedFiles = Array.from(files || []).filter(f => f.type.startsWith("video/"));
-    if (!selectedFiles.length) { toast("Please select video files."); return; }
-    $("#uploadSummary").textContent = `${selectedFiles.length} video(s) selected · ${bytes(selectedFiles.reduce((sum,f)=>sum+f.size,0))}. Stored in this browser only.`;
-    $("#captionInput").value = "";
-    if (dialog.showModal) dialog.showModal();
-    else if (confirm(`Add ${selectedFiles.length} videos?`)) saveVideos();
-  }
-  async function saveVideos() {
-    if (!selectedFiles.length) return;
-    const files = selectedFiles.slice(), caption = $("#captionInput").value.trim(), button = $("#saveVideos");
-    button.disabled = true; button.textContent = "Saving…";
-    let saved = 0;
-    try {
-      for (const file of files) {
-        await put({id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-          name:file.name, caption, blob:file, type:file.type || "video/mp4", size:file.size,
-          createdAt:Date.now()+saved, liked:false, likes:0});
-        saved++;
+  async function saveVideos(){
+    if(!selectedFiles.length)return;
+    const files=selectedFiles.slice(),caption=$("#captionInput").value.trim(),btn=$("#saveVideos");
+    btn.disabled=true;btn.textContent="Saving…";let count=0;
+    try{
+      for(const file of files){
+        await put({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,name:file.name,caption,blob:file,type:file.type||"video/mp4",size:file.size,createdAt:Date.now()+count});
+        count++;
       }
-      selectedFiles = []; picker.value = ""; if (dialog.open) dialog.close();
-      await reload(); view = "feed"; render(); toast(`${saved} reel(s) added`);
-    } catch (e) {
-      console.error(e); toast("Storage full or browser could not save these videos. Try fewer/smaller files.");
-      await reload(); render();
-    } finally { button.disabled = false; button.textContent = "Add reels"; }
+      selectedFiles=[];picker.value="";if(dialog.open)dialog.close();
+      await reload();newShuffle();view="feed";render();notify(`${count} videos added in original file quality.`);
+    }catch(e){console.error(e);notify("Browser storage limit reached. Try fewer or smaller videos.");await reload();render();}
+    finally{btn.disabled=false;btn.textContent="Add reels";}
   }
-  function visibleReels() {
-    let list = reels.slice();
-    if (view === "liked") list = list.filter(r => r.liked);
-    if (query) { const q=query.toLowerCase(); list=list.filter(r=>(r.name+" "+r.caption).toLowerCase().includes(q)); }
-    const sort = $("#sortSelect").value;
-    list.sort(sort==="oldest" ? (a,b)=>a.createdAt-b.createdAt : sort==="liked" ? (a,b)=>b.likes-a.likes || b.createdAt-a.createdAt : (a,b)=>b.createdAt-a.createdAt);
+  async function reload(){videos=await getAll();}
+  function orderedVideos(){
+    const byId=new Map(videos.map(v=>[v.id,v]));
+    const list=shuffledIds.map(id=>byId.get(id)).filter(Boolean);
+    videos.forEach(v=>{if(!shuffledIds.includes(v.id))list.push(v);});
     return list;
   }
-  function makeCard(r, i) {
-    const card = document.createElement("article"); card.className = "reel-card"; card.dataset.id = r.id;
-    const videoUrl = URL.createObjectURL(r.blob);
-    const caption = r.caption || r.name.replace(/\.[^/.]+$/, "");
-    card.innerHTML = `<div class="video-wrap paused">
-      <video class="reel-video" src="${videoUrl}" playsinline loop preload="metadata" aria-label="${escapeHTML(r.name)}"></video>
+  function makeCard(v,index){
+    const url=URL.createObjectURL(v.blob),caption=v.caption||v.name.replace(/\.[^/.]+$/,"");
+    const card=document.createElement("article");card.className="reel-card";card.dataset.id=v.id;
+    card.innerHTML=`<div class="video-wrap paused">
+      <video class="reel-video" src="${url}" playsinline loop preload="metadata" aria-label="${esc(v.name)}"></video>
       <button class="video-control" tabindex="-1" aria-hidden="true"><span>▶</span></button>
-      <div class="reel-top"><span class="user-avatar">Y</span><span>your_reel</span><button class="follow-btn" data-action="follow">Following</button></div>
+      <div class="reel-top"><span class="user-avatar">Y</span><span>your_reel</span></div>
       <div class="reel-actions">
-        <button class="reel-action like-action ${r.liked?"liked":""}" data-action="like" aria-label="Like reel"><span class="glyph">${r.liked?"♥":"♡"}</span><small>${r.likes||0}</small></button>
-        <button class="reel-action" data-action="comment" aria-label="Caption"><span class="glyph">▢</span><small>Caption</small></button>
         <button class="reel-action" data-action="sound" aria-label="Toggle sound"><span class="glyph">♬</span><small>Sound</small></button>
-        <button class="reel-action" data-action="more" aria-label="More options"><span class="glyph">•••</span><small>More</small></button>
+        <button class="reel-action" data-action="caption" aria-label="Show caption"><span class="glyph">☰</span><small>Caption</small></button>
+        <button class="reel-action" data-action="delete" aria-label="Delete reel"><span class="glyph">⋯</span><small>Remove</small></button>
       </div>
-      <div class="reel-caption"><strong>your_reel</strong><p>${escapeHTML(caption)}</p><div class="audio-line">♫ <span>${escapeHTML(r.name.replace(/\.[^/.]+$/, ""))}</span></div></div>
+      <div class="reel-caption"><strong>your_reel</strong><p>${esc(caption)}</p><div class="audio-line">♫ <span>${esc(v.name.replace(/\.[^/.]+$/,""))}</span></div></div>
     </div>
-    <div class="reel-footer"><span class="file-name">${escapeHTML(r.name)} · ${bytes(r.size)}</span><div class="footer-actions"><button class="text-btn" data-action="download">Download</button><button class="text-btn delete-btn" data-action="delete">Delete</button></div></div>`;
-    const video = card.querySelector("video");
-    video.addEventListener("click", () => togglePlay(card));
-    video.addEventListener("play", () => card.querySelector(".video-wrap").classList.remove("paused"));
-    video.addEventListener("pause", () => card.querySelector(".video-wrap").classList.add("paused"));
+    <div class="reel-footer"><span class="file-name">${esc(v.name)} · ${sizeText(v.size)}</span><div class="footer-actions"><button class="text-btn" data-action="download">Download</button><button class="text-btn delete-btn" data-action="delete">Delete</button></div></div>`;
+    const video=card.querySelector("video");
+    video.addEventListener("click",()=>togglePlay(card));
+    video.addEventListener("play",()=>card.querySelector(".video-wrap").classList.remove("paused"));
+    video.addEventListener("pause",()=>card.querySelector(".video-wrap").classList.add("paused"));
     return card;
   }
-  function render() {
-    const list = visibleReels(); feed.replaceChildren();
-    $("#pageTitle").textContent = view === "liked" ? "Liked reels" : "Reels";
-    $("#feedLabel").textContent = view === "liked" ? "Liked reels" : query ? "Search results" : "Your reels";
-    $("#reelCount").textContent = list.length;
-    $("#emptyState").hidden = list.length > 0 || (reels.length > 0 && (query || view === "liked"));
-    if (!list.length && (query || view === "liked") && reels.length) {
-      const no = document.createElement("div"); no.className = "empty-state"; no.innerHTML = `<h2>${query?"No results found":"No liked reels yet"}</h2><p>${query?"Try another caption or filename.":"Tap the heart on a reel to save it here."}</p>`; feed.append(no);
-    } else list.forEach((r,i)=>feed.append(makeCard(r,i)));
-    document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("selected", b.dataset.view === view || (view==="feed" && b.dataset.view==="feed")));
+  function render(){
+    const ordered=orderedVideos();
+    $("#pageTitle").textContent=view==="profile"?"Profile":"Reels";
+    $("#feedView").hidden=view==="profile";
+    $("#profilePanel").hidden=view!=="profile";
+    $("#feedLabel").textContent="Random reel feed";
+    $("#reelCount").textContent=`${videos.length} videos`;
+    $("#profilePosts").textContent=videos.length;
+    $("#profileReels").textContent=videos.length;
+    $("#profileSize").textContent=sizeText(videos.reduce((n,v)=>n+(v.size||0),0));
+    $("#emptyState").hidden=videos.length>0;
+    feed.replaceChildren();
+    ordered.forEach((v,i)=>feed.append(makeCard(v,i)));
+    const grid=$("#profileGrid");grid.replaceChildren();
+    ordered.forEach(v=>{
+      const b=document.createElement("button");b.className="grid-video";b.title=v.name;
+      const u=URL.createObjectURL(v.blob);b.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span>`;
+      b.addEventListener("click",()=>{view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
+      grid.append(b);
+    });
+    document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>b.classList.toggle("selected",b.dataset.action===view||(view==="feed"&&b.dataset.action==="feed")));
   }
-  async function reload() { reels = await getAll(); }
-  function togglePlay(card) {
-    const video = card.querySelector("video");
-    if (video.paused) {
-      document.querySelectorAll(".reel-video").forEach(v=>{if(v!==video)v.pause();});
-      video.play().catch(()=>toast("Tap the video to play."));
-    } else video.pause();
+  function togglePlay(card){
+    const v=card.querySelector("video");
+    if(v.paused){document.querySelectorAll(".reel-video").forEach(other=>{if(other!==v)other.pause();});v.play().catch(()=>notify("Tap the video again to play."));}
+    else v.pause();
   }
-  async function handleAction(button) {
-    const card = button.closest(".reel-card"); if (!card) return;
-    const item = reels.find(r=>r.id===card.dataset.id); if (!item) return;
-    switch(button.dataset.action) {
-      case "like":
-        item.liked = !item.liked; item.likes = Math.max(0,(item.likes||0)+(item.liked?1:-1));
-        await put(item); render(); break;
-      case "comment": toast(item.caption || item.name); break;
-      case "sound": {
-        const v=card.querySelector("video"); v.muted=!v.muted;
-        button.querySelector(".glyph").textContent=v.muted?"♩":"♬";
-        button.querySelector("small").textContent=v.muted?"Muted":"Sound";
-        break;
-      }
-      case "more":
-        if (confirm(`Delete "${item.name}" from your local library?`)) await deleteItem(item,card);
-        break;
-      case "delete":
-        if (confirm(`Delete "${item.name}" from your local library?`)) await deleteItem(item,card);
-        break;
-      case "download": {
-        const url=URL.createObjectURL(item.blob), a=document.createElement("a");
-        a.href=url; a.download=item.name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1200); break;
-      }
-      case "follow": toast("This is your private local profile."); break;
+  async function deleteVideo(card){
+    const v=videos.find(item=>item.id===card.dataset.id);if(!v)return;
+    if(!confirm(`Remove "${v.name}" from this browser?`))return;
+    card.querySelector("video")?.pause();await remove(v.id);await reload();newShuffle();render();notify("Video removed.");
+  }
+  async function action(button){
+    const card=button.closest(".reel-card");if(!card)return;
+    const item=videos.find(v=>v.id===card.dataset.id);if(!item)return;
+    switch(button.dataset.action){
+      case "sound":{const v=card.querySelector("video");v.muted=!v.muted;button.querySelector(".glyph").textContent=v.muted?"♩":"♬";button.querySelector("small").textContent=v.muted?"Muted":"Sound";break;}
+      case "caption":notify(item.caption||item.name);break;
+      case "delete":await deleteVideo(card);break;
+      case "download":{const u=URL.createObjectURL(item.blob),a=document.createElement("a");a.href=u;a.download=item.name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500);break;}
     }
   }
-  async function deleteItem(item, card) {
-    card.querySelector("video").pause(); await remove(item.id); await reload(); render(); toast("Reel deleted.");
+  function setView(next){
+    if(next==="upload"){openPicker();return;}
+    view=next==="profile"?"profile":"feed";render();
+    if(innerWidth<700)scrollTo({top:0,behavior:"smooth"});
   }
-  function setView(next) {
-    if (next==="upload") { openPicker(); return; }
-    if (next==="search") { expandSearch(); return; }
-    view = next; render(); if (innerWidth<700) scrollTo({top:0,behavior:"smooth"});
-  }
-  function expandSearch() {
-    const field = document.querySelector(".search-field");
-    field.classList.add("expanded"); $("#searchInput").focus();
-    if (innerWidth<700) scrollTo({top:0,behavior:"smooth"});
-  }
-
-  document.addEventListener("click", e => {
-    const b=e.target.closest("button"); if(!b)return;
-    if(b.closest(".reel-card") && b.dataset.action){handleAction(b);return;}
-    if(b.dataset.view){setView(b.dataset.view);return;}
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("button");if(!b)return;
+    if(b.closest(".reel-card")&&b.dataset.action){action(b);return;}
+    if(b.dataset.action)setView(b.dataset.action);
   });
-  ["#desktopUpload","#mobileUpload","#storyUpload","#storyUpload2","#emptyUpload","#uploadButton"].forEach(s=>$(s).addEventListener("click",openPicker));
+  picker.addEventListener("change",()=>selectFiles(picker.files));
   $("#saveVideos").addEventListener("click",saveVideos);
-  picker.addEventListener("change",()=>selectVideos(picker.files));
-  $("#searchInput").addEventListener("input",e=>{query=e.target.value.trim();render();});
-  $("#mobileSearch").addEventListener("click",expandSearch);
-  $("#bottomSearch").addEventListener("click",expandSearch);
-  $("#sortSelect").addEventListener("change",render);
   $("#uploadForm").addEventListener("submit",()=>{selectedFiles=[];});
-  feed.addEventListener("dblclick",async e=>{
-    const card=e.target.closest(".reel-card"); if(!card)return;
-    const item=reels.find(r=>r.id===card.dataset.id); if(item&&!item.liked){item.liked=true;item.likes=(item.likes||0)+1;await put(item);render();}
-  });
-
-  if ("IntersectionObserver" in window) {
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => {
-      const video=entry.target.querySelector("video"); if(!video)return;
-      if(entry.isIntersecting && entry.intersectionRatio>=.72){
-        document.querySelectorAll(".reel-video").forEach(v=>{if(v!==video)v.pause();});
+  if("IntersectionObserver"in window){
+    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+      const video=entry.target.querySelector("video");if(!video)return;
+      if(entry.isIntersecting&&entry.intersectionRatio>=.78){
+        document.querySelectorAll(".reel-video").forEach(other=>{if(other!==video)other.pause();});
         video.play().catch(()=>{});
-      } else video.pause();
-    }),{threshold:[0,.25,.72,1]});
-    new MutationObserver(()=>document.querySelectorAll(".reel-card:not([data-observed])").forEach(c=>{c.dataset.observed="1";observer.observe(c);})).observe(feed,{childList:true});
+      }else video.pause();
+    }),{threshold:[0,.3,.78,1]});
+    new MutationObserver(()=>document.querySelectorAll("#reelFeed .reel-card:not([data-observed])").forEach(card=>{card.dataset.observed="1";observer.observe(card);})).observe(feed,{childList:true});
   }
-  (async()=>{try{if(!("indexedDB" in window))throw Error("No IndexedDB");await openDB();await reload();render();}catch(e){console.error(e);$("#emptyState").querySelector("p").textContent="This browser cannot access local storage. Please use an up-to-date version of Chrome, Edge, or Safari.";toast("Browser storage unavailable.");}})();
+  (async()=>{try{if(!("indexedDB"in window))throw Error("IndexedDB unavailable");await openDB();await reload();newShuffle();render();}catch(e){console.error(e);notify("Local browser storage is unavailable.");}})();
 })();
