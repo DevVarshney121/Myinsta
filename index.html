@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="A private, browser-based short video feed built with HTML, CSS and JavaScript.">
+  <title>Reels — Reelgram</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="desktop-sidebar">
+    <a class="wordmark" href="#" aria-label="Home">Reelgram</a>
+    <nav>
+      <button class="side-link active" data-view="feed"><span class="nav-symbol">⌂</span><span>Home</span></button>
+      <button class="side-link" data-view="search"><span class="nav-symbol">⌕</span><span>Search</span></button>
+      <button class="side-link active" data-view="feed"><span class="nav-symbol reels-symbol">▣</span><span>Reels</span></button>
+      <button class="side-link" data-view="liked"><span class="nav-symbol">♡</span><span>Liked</span></button>
+      <button class="side-link" data-view="upload"><span class="nav-symbol">＋</span><span>Create</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="side-link" id="desktopUpload"><span class="nav-symbol">＋</span><span>Upload reels</span></button>
+      <p>Private local library</p>
+    </div>
+  </div>
+
+  <header class="mobile-top">
+    <a class="mobile-wordmark" href="#">Reelgram <span>⌄</span></a>
+    <div class="mobile-top-actions">
+      <button id="mobileSearch" aria-label="Search">⌕</button>
+      <button id="mobileUpload" aria-label="Upload reels">＋</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="desktop-header">
+      <div><span class="kicker">YOUR PERSONAL VIDEO FEED</span><h1 id="pageTitle">Reels</h1></div>
+      <div class="desktop-tools">
+        <label class="search-field"><span>⌕</span><input id="searchInput" type="search" placeholder="Search captions or files"></label>
+        <select id="sortSelect" aria-label="Sort reels"><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="liked">Most liked</option></select>
+        <button class="primary-btn" id="uploadButton">＋ Upload</button>
+      </div>
+    </div>
+
+    <section class="stories" aria-label="Quick actions">
+      <button class="story" id="storyUpload"><span class="story-circle add-circle"><span>＋</span></span><small>Your reel</small></button>
+      <button class="story" data-view="feed"><span class="story-circle story-grad"><span class="story-inner">▶</span></span><small>For you</small></button>
+      <button class="story" data-view="liked"><span class="story-circle story-pink"><span class="story-inner">♡</span></span><small>Liked</small></button>
+      <button class="story" id="storyUpload2"><span class="story-circle story-orange"><span class="story-inner">↑</span></span><small>Add more</small></button>
+    </section>
+
+    <section class="feed-area">
+      <div class="feed-head"><div><span class="feed-dot"></span><span id="feedLabel">Your reels</span><span class="total-pill" id="reelCount">0</span></div><span class="scroll-hint">Scroll to explore ↓</span></div>
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">▣<span>＋</span></div>
+        <h2>Share your first reel</h2>
+        <p>Select videos from your device and build your own private reels feed.</p>
+        <button class="primary-btn" id="emptyUpload">Select videos</button>
+        <small>Choose multiple videos at once · Stored in this browser</small>
+      </div>
+      <div id="reelFeed" class="reel-feed"></div>
+    </section>
+  </main>
+
+  <nav class="mobile-bottom" aria-label="Mobile navigation">
+    <button data-view="feed" class="bottom-link"><span>⌂</span><small>Home</small></button>
+    <button id="bottomSearch" class="bottom-link"><span>⌕</span><small>Search</small></button>
+    <button data-view="upload" class="bottom-link create-bottom"><span>＋</span><small>Create</small></button>
+    <button data-view="liked" class="bottom-link"><span>♡</span><small>Liked</small></button>
+    <button data-view="feed" class="bottom-link selected"><span>▣</span><small>Reels</small></button>
+  </nav>
+
+  <input id="videoPicker" type="file" accept="video/*" multiple hidden>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="uploadDialog">
+    <form method="dialog" id="uploadForm">
+      <div class="dialog-top"><div><span class="kicker">CREATE</span><h2>Add reels</h2></div><button class="close-btn" value="cancel" aria-label="Close">×</button></div>
+      <p id="uploadSummary">Your selected videos will be saved only in this browser.</p>
+      <label for="captionInput">Caption (optional)</label>
+      <textarea id="captionInput" maxlength="2200" rows="3" placeholder="Write a caption..."></textarea>
+      <div class="dialog-buttons"><button class="secondary-btn" value="cancel">Cancel</button><button class="primary-btn" id="saveVideos" type="button">Add reels</button></div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
