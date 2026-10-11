@@ -3,7 +3,7 @@
   const DB_NAME="reelgram-private-video-library", DB_VERSION=1, STORE="videos";
   const $=s=>document.querySelector(s);
   const picker=$("#videoPicker"), dialog=$("#uploadDialog"), feed=$("#reelFeed");
-  let db, videos=[], selectedFiles=[], view="feed", toastTimer, shuffledIds=[];
+  let db, videos=[], selectedFiles=[], view="home", toastTimer, shuffledIds=[];
 
   const openDB=()=>new Promise((resolve,reject)=>{
     const r=indexedDB.open(DB_NAME,DB_VERSION);
@@ -75,6 +75,7 @@
     $("#feedView").hidden=view!=="feed";
     $("#profilePanel").hidden=view!=="profile";
     $("#feedView").classList.toggle("reels-active",view==="feed");
+    document.body.classList.toggle("reels-open",view==="feed");
     $("#feedLabel").textContent="Random reel feed";
     $("#reelCount").textContent=`${videos.length} videos`;
     $("#profilePosts").textContent=videos.length;
@@ -84,36 +85,49 @@
     $("#homeVideoCount").textContent=`${videos.length} videos`;
     $("#homeEmpty").hidden=videos.length>0;
     $("#emptyState").hidden=true;
+
+    // Dedicated viewer cards are shuffled and have no download/delete controls.
     feed.replaceChildren();
     ordered.forEach((v,i)=>feed.append(makeCard(v,i)));
 
-    // Home shows a regular, scrollable grid of all videos. Tapping any tile opens that reel.
-    const homeGrid=$("#homeRecent");homeGrid.replaceChildren();
+    // Home behaves like a normal feed: story strip + stacked video posts. Tapping a post opens Reels at that video.
+    const storyRow=$("#storyRow");storyRow.replaceChildren();
+    const stories=[{label:"Your story",initial:"＋"},...videos.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,12).map(v=>({label:v.name.replace(/\.[^/.]+$/,""),initial:"▶"}))];
+    stories.forEach(s=>{
+      const item=document.createElement("button");item.className="story-item";item.innerHTML=`<div class="story-ring"><div class="story-ring-inner">${esc(s.initial)}</div></div><small>${esc(s.label)}</small>`;
+      item.addEventListener("click",()=>{if(s.label==="Your story")openPicker();else{const found=videos.find(v=>v.name.replace(/\.[^/.]+$/,"")===s.label);if(found)openReel(found.id);}});
+      storyRow.append(item);
+    });
+    const homeFeed=$("#homeRecent");homeFeed.replaceChildren();
     videos.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(v=>{
       const tile=document.createElement("button");tile.className="home-post";tile.title=v.name;
       const u=URL.createObjectURL(v.blob);
-      tile.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span class="post-play">▶</span><span class="post-caption">${esc(v.caption||v.name)}</span>`;
-      tile.addEventListener("click",()=>{
-        view="feed";render();
-        const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);
-        if(target) target.scrollIntoView({behavior:"smooth",block:"start"});
-        const video=target?.querySelector("video");
-        if(video) setTimeout(()=>video.play().catch(()=>{}),350);
-      });
-      homeGrid.append(tile);
+      tile.innerHTML=`<div class="home-post-head"><span class="user-avatar">Y</span><span>your_reel</span></div><video src="${u}" muted playsinline preload="metadata"></video><span class="post-play">▶</span><span class="post-caption">${esc(v.caption||v.name)}</span>`;
+      tile.addEventListener("click",()=>openReel(v.id));
+      homeFeed.append(tile);
     });
 
     const grid=$("#profileGrid");grid.replaceChildren();
     ordered.forEach(v=>{
-      const wrap=document.createElement("button");wrap.className="grid-video";wrap.title=v.name;
+      const wrap=document.createElement("div");wrap.className="grid-video";wrap.title=v.name;wrap.setAttribute("role","button");wrap.tabIndex=0;
       const u=URL.createObjectURL(v.blob);wrap.innerHTML=`<video src="${u}" muted playsinline preload="metadata"></video><span>▶</span><button type="button" class="profile-delete" data-profile-delete="${esc(v.id)}">Delete</button><button type="button" class="profile-download" data-profile-download="${esc(v.id)}">Download</button>`;
-      wrap.addEventListener("click",(event)=>{if(event.target.closest("[data-profile-delete],[data-profile-download]"))return;view="feed";render();const target=feed.querySelector(`[data-id="${CSS.escape(v.id)}"]`);target?.scrollIntoView({behavior:"smooth",block:"start"});});
+      wrap.addEventListener("click",(event)=>{if(event.target.closest("[data-profile-delete],[data-profile-download]"))return;openReel(v.id);});
       grid.append(wrap);
     });
     document.querySelectorAll(".bottom-link[data-action],.side-link[data-action]").forEach(b=>{
       b.classList.toggle("selected",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
       b.classList.toggle("active",b.dataset.action===view || (view==="feed"&&b.dataset.action==="feed"));
     });
+  }
+  function openReel(id){
+    newShuffle();
+    const at=shuffledIds.indexOf(id);
+    if(at>0){shuffledIds.splice(at,1);shuffledIds.unshift(id);}
+    view="feed";render();
+    const target=feed.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    if(target) target.scrollIntoView({behavior:"instant",block:"start"});
+    const video=target?.querySelector("video");
+    if(video) setTimeout(()=>video.play().catch(()=>{}),120);
   }
   function togglePlay(card){
     const v=card.querySelector("video");
@@ -137,7 +151,7 @@
   }
   function setView(next){
     if(next==="upload"){openPicker();return;}
-    view=next==="profile"?"profile":next==="home"?"home":"feed";
+    view=next==="profile"?"profile":next==="feed"?"feed":"home";
     render();
     if(innerWidth<700)scrollTo({top:0,behavior:"smooth"});
   }
